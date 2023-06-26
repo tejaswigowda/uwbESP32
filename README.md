@@ -1,3 +1,3 @@
 # uwbESP32
 
-<img src='settings.png' width=300>
+<img src='settings.png' width=400>
