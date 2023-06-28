@@ -1,11 +1,21 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <WebSocketsClient.h>
 
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include <BLE2902.h>
+#define WIFI_SSID "NETGEAR31"
+#define WIFI_PASSWD "fluffywind2904"
+// #define SOFTAP_MODE       //The comment will be connected to the specified ssid
 
 
-BLECharacteristic* pCharacteristic;
+unsigned long sendInterval = 1;
+unsigned long sendIntervalMillis = sendInterval * 1000;
+
+unsigned long nextSend = millis();
+int lastSendSec = -1;
+
+String macAddress;
+String ipAddress;
 
 #include "soc/rtc_wdt.h"
 
@@ -24,9 +34,68 @@ const uint8_t PIN_RST = 27;  // reset pin
 const uint8_t PIN_IRQ = 34;  // irq pin
 const uint8_t PIN_SS = 4;    // spi select pin
 
+
+
+WebSocketsClient webSocket;
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.printf("[WSc] Disconnected!\n");
+      break;
+    case WStype_CONNECTED: {
+      Serial.printf("[WSc] Connected to url: %s\n", payload);
+    }
+      break;
+    case WStype_TEXT:
+      Serial.printf("[WSc] get text: %s\n", payload);
+      break;
+    case WStype_BIN:
+      Serial.printf("[WSc] get binary length: %u\n", length);
+      break;
+    case WStype_PING:
+        // pong will be send automatically
+        Serial.printf("[WSc] get ping\n");
+        break;
+    case WStype_PONG:
+        // answer to a ping we send
+        Serial.printf("[WSc] get pong\n");
+        break;
+    }
+
+}
+
+void setupNetwork() {
+  macAddress = "";
+#ifdef SOFTAP_MODE
+  WiFi.mode(WIFI_AP);
+  macAddress += WiFi.softAPmacAddress().substring(0, 5);
+  WiFi.softAP(macAddress.c_str());
+  ipAddress = WiFi.softAPIP().toString();
+#else
+  WiFi.begin(WIFI_SSID, WIFI_PASSWD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  ipAddress = WiFi.localIP().toString();
+  macAddress = String(WiFi.macAddress());
+#endif
+}
+
+
 void setup() {
   Serial.begin(115200);
   rtc_wdt_protect_off();  // Turns off the automatic wdt service
+
+  setupNetwork();
+
+  webSocket.begin("mocap.local", 3000, "/uwb32");
+  webSocket.onEvent(webSocketEvent);
+  webSocket.setReconnectInterval(5000);
 
   delay(1000);
 
@@ -48,17 +117,20 @@ void setup() {
   // DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_LONGDATA_RANGE_LOWPOWER, false);
   // DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_SHORTDATA_FAST_LOWPOWER);
   // DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_LONGDATA_FAST_LOWPOWER);
-   // DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_SHORTDATA_FAST_ACCURACY);
+  // DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_SHORTDATA_FAST_ACCURACY);
   // DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_LONGDATA_FAST_ACCURACY);
-   DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_LONGDATA_RANGE_ACCURACY);
+  DW1000Ranging.startAsAnchor(ANCHOR_ADD, DW1000.MODE_LONGDATA_RANGE_ACCURACY);
 
-    rtc_wdt_enable();       // Turn it on manually
+  rtc_wdt_enable();  // Turn it on manually
   rtc_wdt_set_time(RTC_WDT_STAGE0, 20000);
 }
 
 void loop() {
   DW1000Ranging.loop();
-  //Serial.println(millis());
+  webSocket.loop();
+  uint64_t now = millis();
+
+
   rtc_wdt_feed();
 }
 
@@ -71,6 +143,8 @@ void newRange() {
   Serial.print("\t RX power: ");
   Serial.print(DW1000Ranging.getDistantDevice()->getRXPower());
   Serial.println(" dBm");
+  String message = String(millis());
+  webSocket.sendTXT(message);
 }
 
 void newBlink(DW1000Device *device) {

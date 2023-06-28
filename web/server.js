@@ -37,11 +37,11 @@ wss2.on('connection', function connection(ws) {
 server.on('upgrade', function upgrade(request, socket, head) {
   const pathname = url.parse(request.url).pathname;
 
-  if (pathname === '/web') {
+  if (pathname === '/uwb32') {
     wss1.handleUpgrade(request, socket, head, function done(ws) {
       wss1.emit('connection', ws, request);
     });
-  } else if (pathname === '/uwb32') {
+  } else if (pathname === '/web') {
     wss2.handleUpgrade(request, socket, head, function done(ws) {
       wss2.emit('connection', ws, request);
     });

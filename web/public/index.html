@@ -23,9 +23,13 @@
 
                ws.onmessage = function (evt) {
                   var received_msg = evt.data;
-                 // console.log(received_msg);
-                   obj = received_msg;
-                   updateCube();
+                  // blob to string
+                  received_msg.text().then(text => {
+                    let blobText = text
+                    console.log(blobText)
+                  })
+
+                   //updateCube();
                };
 
                ws.onclose = function() {
