@@ -154,6 +154,7 @@ void newRange() {
   Serial.print(DW1000Ranging.getDistantDevice()->getRXPower());
   Serial.println(" dBm");
 
+  //auto dev = String(DW1000Ranging.getDistantDevice()->getShortAddress()) + " ";
   auto dev = String(DW1000Ranging.getDistantDevice()->getAddress()) + " ";
   auto dist = String(DW1000Ranging.getDistantDevice()->getRange()) + " ";
   auto rssi = String(DW1000Ranging.getDistantDevice()->getRXPower()) + " ";
