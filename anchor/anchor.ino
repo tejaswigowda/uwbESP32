@@ -163,7 +163,7 @@ void newRange() {
   auto humidity = String(sensor.getHumidity()) + "%";
 
 
-  String message = dev + dist + rssi + temperature + ", " + pressure + ", " + humidity;
+  String message = dev + dist + rssi + temperature + pressure + humidity;
   webSocket.sendTXT(message);
 }
 
