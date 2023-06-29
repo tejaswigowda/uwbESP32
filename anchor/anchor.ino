@@ -2,6 +2,10 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <WebSocketsClient.h>
+#include <Bme280.h>
+
+Bme280TwoWire sensor;
+
 
 #define WIFI_SSID "NETGEAR31"
 #define WIFI_PASSWD "fluffywind2904"
@@ -38,15 +42,16 @@ const uint8_t PIN_SS = 4;    // spi select pin
 
 WebSocketsClient webSocket;
 
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
 
-  switch(type) {
+  switch (type) {
     case WStype_DISCONNECTED:
       Serial.printf("[WSc] Disconnected!\n");
       break;
-    case WStype_CONNECTED: {
-      Serial.printf("[WSc] Connected to url: %s\n", payload);
-    }
+    case WStype_CONNECTED:
+      {
+        Serial.printf("[WSc] Connected to url: %s\n", payload);
+      }
       break;
     case WStype_TEXT:
       Serial.printf("[WSc] get text: %s\n", payload);
@@ -55,15 +60,14 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       Serial.printf("[WSc] get binary length: %u\n", length);
       break;
     case WStype_PING:
-        // pong will be send automatically
-        Serial.printf("[WSc] get ping\n");
-        break;
+      // pong will be send automatically
+      Serial.printf("[WSc] get ping\n");
+      break;
     case WStype_PONG:
-        // answer to a ping we send
-        Serial.printf("[WSc] get pong\n");
-        break;
-    }
-
+      // answer to a ping we send
+      Serial.printf("[WSc] get pong\n");
+      break;
+  }
 }
 
 void setupNetwork() {
@@ -92,6 +96,12 @@ void setup() {
   rtc_wdt_protect_off();  // Turns off the automatic wdt service
 
   setupNetwork();
+
+  Wire.begin(22, 21);
+
+
+  sensor.begin(Bme280TwoWireAddress::Primary);
+  sensor.setSettings(Bme280Settings::indoor());
 
   webSocket.begin("mocap.local", 3000, "/uwb32");
   webSocket.onEvent(webSocketEvent);
@@ -136,14 +146,24 @@ void loop() {
 
 void newRange() {
   Serial.print("from: ");
-  Serial.print(DW1000Ranging.getDistantDevice()->getShortAddress(), HEX);
+  Serial.print(DW1000Ranging.getDistantDevice()->getAddress());
   Serial.print("\t Range: ");
   Serial.print(DW1000Ranging.getDistantDevice()->getRange());
   Serial.print(" m");
   Serial.print("\t RX power: ");
   Serial.print(DW1000Ranging.getDistantDevice()->getRXPower());
   Serial.println(" dBm");
-  String message = String(millis());
+
+  auto dev = String(DW1000Ranging.getDistantDevice()->getAddress()) + " ";
+  auto dist = String(DW1000Ranging.getDistantDevice()->getRange()) + " ";
+  auto rssi = String(DW1000Ranging.getDistantDevice()->getRXPower()) + " ";
+
+  auto temperature = String(sensor.getTemperature()) + "°C ";
+  auto pressure = String(sensor.getPressure() / 100.0) + "hPa ";
+  auto humidity = String(sensor.getHumidity()) + "%";
+
+
+  String message = dev + dist + rssi + temperature + ", " + pressure + ", " + humidity;
   webSocket.sendTXT(message);
 }
 
